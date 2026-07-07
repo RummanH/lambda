@@ -1,0 +1,24 @@
+# Dependencies
+**/node_modules
+
+# Build output
+backend/dist
+frontend/dist
+backend-lambda.zip
+
+# Env files (never commit real secrets - .env.example files are tracked)
+.env
+.env.local
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+*.log
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

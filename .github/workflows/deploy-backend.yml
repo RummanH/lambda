@@ -1,0 +1,52 @@
+name: Deploy Backend to Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      # Re-install with only production deps so the zip doesn't ship
+      # typescript/@nestjs/cli/etc, which Lambda never needs at runtime.
+      - name: Install production-only dependencies
+        run: npm ci --omit=dev
+
+      - name: Zip deployment package
+        run: zip -r ../backend-lambda.zip dist node_modules package.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Assumes the Lambda function already exists (created manually, per
+      # the deploy guide) - this only pushes new code, it never creates
+      # or reconfigures the function/API Gateway/IAM.
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --zip-file fileb://../backend-lambda.zip

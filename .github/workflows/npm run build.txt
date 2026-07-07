@@ -1,0 +1,65 @@
+npm run build
+npm ci --omit=dev
+ // zip -r ../backend-lambda.zip dist node_modules package.json
+Compress-Archive -Path dist,node_modules,package.json -DestinationPath ..\backend-lambda.zip -Force
+npm install
+
+
+Lambda
+Create function
+Author from scratch
+
+Code - tab
+Upload from - .zip
+Runtime settings
+Handler: dist/lambda.handler
+
+
+Configuration
+General configuration
+Edit
+Timeout: 10 sec
+Memory: 256 MB
+
+
+Test
+Create new event
+
+
+
+------------------------------------------------------------
+API Gateway → APIs → Create API → under HTTP API → Build.
+Add integration - Lambda - pick your region and function
+Configure routes: Method ANY, path /{proxy+} → Next
+Configure stages: keep $default with Auto-deploy on → Next → Create
+Invoke URL
+
+
+
+IAM - Users - Create user - Name - github-actions-deployer
+Attach policies directly → Create inline policy → JSON tab:
+
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "lambda:UpdateFunctionCode",
+    "Resource": "arn:aws:lambda:<region>:<account-id>:function:cognito-demo-backend"
+  }]
+}
+
+Policy Name
+
+
+Create the user → open it → Security credentials → Create access key → use case "Application running outside AWS" → copy the Access key ID and Secret access key now (shown once).
+
+2. Add secrets to GitHub
+
+Repo → Settings → Secrets and variables → Actions → New repository secret, four times:
+
+Secret	Value
+AWS_ACCESS_KEY_ID	from step 1
+AWS_SECRET_ACCESS_KEY	from step 1
+AWS_REGION	e.g. us-east-1
+LAMBDA_FUNCTION_NAME	cognito-demo-backend
+
