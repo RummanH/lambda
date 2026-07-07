@@ -1,0 +1,177 @@
+DEPLOYMENT GUIDE
+================
+
+Hi! This is the full process, start to finish, for getting this backend
+live on AWS Lambda with auto-deploy from git push. Take it one step at a
+time, in order - each part builds on the one before it.
+
+
+PART 1 - CREATE THE LAMBDA FUNCTION (by hand, one time)
+--------------------------------------------------------
+
+1. Build and zip the backend
+   Open a terminal in demo/backend and run:
+
+     npm run build
+     npm ci --omit=dev
+     zip -r ../backend-lambda.zip dist node_modules package.json
+     npm install
+
+   (The last "npm install" just restores your dev dependencies for local
+   work afterward. On plain PowerShell without "zip", use:
+     Compress-Archive -Path dist,node_modules,package.json -DestinationPath ..\backend-lambda.zip -Force)
+
+2. Create the function in the AWS Console
+   Go to console.aws.amazon.com -> search "Lambda" -> Create function
+
+     - Author from scratch
+     - Function name: e.g. cognito-demo-backend (reuse this name later)
+     - Runtime: Node.js 24.x
+     - Architecture: x86_64
+     - Leave the default execution role as-is
+     - Create function
+
+3. Upload the code and set the handler
+   Code tab -> Upload from -> .zip file -> pick backend-lambda.zip -> Save
+
+   Still on Code tab -> Runtime settings -> Edit:
+     - Handler: dist/lambda.handler
+
+   Configuration tab -> General configuration -> Edit:
+     - Timeout: 10 sec
+     - Memory: 256 MB
+
+   Watch out: if the zip has an extra wrapper folder (like
+   backend/dist/... instead of dist/... at the root), you'll get a
+   "HandlerNotFound" error. Zip dist, node_modules, and package.json
+   directly, not their parent folder.
+
+4. Test it
+   Test tab -> Create new event -> paste this -> Save -> Test:
+
+     {
+       "version": "2.0",
+       "routeKey": "GET /",
+       "rawPath": "/",
+       "requestContext": { "http": { "method": "GET", "path": "/" } },
+       "headers": {}
+     }
+
+   Success looks like: {"message":"Backend Running"}
+   If it errors, check Monitor -> View CloudWatch logs for the real cause.
+
+
+PART 2 - EXPOSE IT WITH A PUBLIC URL
+--------------------------------------
+
+1. Create an HTTP API
+   Search "API Gateway" -> APIs -> Create API -> HTTP API -> Build
+
+     - Add integration -> Lambda -> pick your function
+     - API name: e.g. cognito-demo-api -> Next
+     - Configure routes: method ANY, path /{proxy+} -> Next
+     - Configure stages: keep $default with Auto-deploy ON -> Next -> Create
+
+   (The console automatically allows API Gateway to call your Lambda -
+   no extra permission step needed.)
+
+2. Test the live URL
+   Copy the "Invoke URL" from the API's page, then:
+
+     curl https://<api-id>.execute-api.<region>.amazonaws.com/
+     curl https://<api-id>.execute-api.<region>.amazonaws.com/items
+
+3. Point the frontend at it
+   In demo/frontend/.env:
+
+     VITE_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
+
+
+PART 3 - AUTO-DEPLOY ON EVERY GIT PUSH
+------------------------------------------
+
+The workflow file demo/.github/workflows/deploy-backend.yml already does
+this for you. It just needs some setup once.
+
+1. Create a narrow IAM user just for deployments
+   Search "IAM" -> Users -> Create user
+
+     - Name: github-actions-deployer
+     - Skip console access (programmatic only)
+     - Attach policies directly -> Create inline policy -> JSON tab:
+
+       {
+         "Version": "2012-10-17",
+         "Statement": [{
+           "Effect": "Allow",
+           "Action": "lambda:UpdateFunctionCode",
+           "Resource": "arn:aws:lambda:<region>:<account-id>:function:cognito-demo-backend"
+         }]
+       }
+
+   Create the user -> open it -> Security credentials -> Create access key
+   -> use case "Application running outside AWS" -> copy both values now
+   (the secret is only shown once).
+
+2. Add these to your GitHub repo
+   Repo -> Settings -> Secrets and variables -> Actions
+
+   Under the SECRETS tab, add:
+     AWS_ACCESS_KEY_ID       -> from step 1
+     AWS_SECRET_ACCESS_KEY   -> from step 1
+     LAMBDA_FUNCTION_NAME    -> cognito-demo-backend
+
+   Under the VARIABLES tab, add:
+     AWS_REGION              -> e.g. us-east-1
+
+   (Region lives in Variables, not Secrets, so you can actually see its
+   value in the GitHub UI and catch typos - it isn't sensitive data.)
+
+3. Push your code
+   From inside demo/:
+
+     git init                     (skip if already a git repo)
+     git add .
+     git commit -m "Initial commit"
+     git branch -M main           (or master, whatever your repo uses)
+     git remote add origin https://github.com/<you>/<repo>.git
+     git push -u origin main
+
+   Check the repo's "Actions" tab - a green check means your code is live
+   on Lambda. From now on, every push touching backend/ redeploys
+   automatically.
+
+4. Confirm it all actually works end to end
+
+     curl https://<api-id>.execute-api.<region>.amazonaws.com/
+     curl https://<api-id>.execute-api.<region>.amazonaws.com/items
+     curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/items ^
+       -H "Content-Type: application/json" -d "{\"name\":\"test\"}"
+
+   Seeing JSON back means the whole pipeline works:
+   git push -> GitHub Actions -> Lambda -> API Gateway -> response.
+
+
+TROUBLESHOOTING CHEAT SHEET
+----------------------------
+
+  Runtime.HandlerNotFound
+    -> zip has a wrapper folder; dist/ must sit at the zip root
+
+  Test event runs but errors
+    -> check Monitor -> View CloudWatch logs on the function page
+
+  Invoke URL returns 403 or 500
+    -> re-check the /{proxy+} route in API Gateway; check CloudWatch logs
+
+  GitHub Action fails on the AWS credentials step
+    -> a secret/variable name is misspelled, or the value has a stray
+       space/quote/newline in it
+
+  GitHub Action fails on "update-function-code"
+    -> LAMBDA_FUNCTION_NAME doesn't match the real function name, or the
+       IAM policy's Resource ARN doesn't match
+
+
+That's the whole thing! If anything goes wrong at any step, copy the exact
+error back to Claude and we'll fix it together.
