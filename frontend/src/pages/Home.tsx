@@ -1,9 +1,14 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { api } from '../services/api';
 
 export default function Home() {
-  const navigate = useNavigate();
+  const handleLogin = () => {
+    // Sends the browser to Cognito's Hosted UI - login and sign-up both
+    // happen there, not in this app. See amplifyConfig.ts / App.tsx for
+    // what happens when Cognito redirects back.
+    authService.login();
+  };
 
   const handleCallProtectedApi = async () => {
     try {
@@ -17,7 +22,6 @@ export default function Home() {
 
   const handleLogout = () => {
     authService.logout();
-    alert('Logged out');
   };
 
   return (
@@ -25,7 +29,7 @@ export default function Home() {
       <h1>AWS Cognito + Lambda Demo</h1>
 
       <div className="button-row">
-        <button onClick={() => navigate('/login')}>Login</button>
+        <button onClick={handleLogin}>Login</button>
         <button onClick={handleCallProtectedApi}>Call Protected API</button>
         <button onClick={handleLogout}>Logout</button>
       </div>

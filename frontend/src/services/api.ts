@@ -8,11 +8,11 @@ export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
 
-// Attach the current access token to every outgoing request.
-// TODO(AWS): once Cognito is integrated, make sure this reads a token
-// that has been verified/refreshed by Amplify rather than a raw value.
-api.interceptors.request.use((config) => {
-  const token = authService.getAccessToken();
+// Attach the current access token to every outgoing request. Amplify's
+// session lookup is async (it may silently refresh an expired token),
+// so this interceptor is async too.
+api.interceptors.request.use(async (config) => {
+  const token = await authService.getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

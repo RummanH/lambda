@@ -2,8 +2,9 @@ DEPLOYMENT GUIDE
 ================
 
 Hi! This is the full process, start to finish, for getting this backend
-live on AWS Lambda with auto-deploy from git push. Take it one step at a
-time, in order - each part builds on the one before it.
+live on AWS Lambda with auto-deploy from git push, plus wiring up Cognito
+login on the frontend. Take it one step at a time, in order - each part
+builds on the one before it.
 
 
 PART 1 - CREATE THE LAMBDA FUNCTION (by hand, one time)
@@ -152,6 +153,61 @@ this for you. It just needs some setup once.
    git push -> GitHub Actions -> Lambda -> API Gateway -> response.
 
 
+PART 4 - WIRE UP COGNITO LOGIN (Hosted UI, redirect-based)
+--------------------------------------------------------------
+
+The frontend is already coded for this (amplifyConfig.ts, authService.ts).
+Login button -> redirects to Cognito's own hosted page -> sign in or sign
+up there -> redirects back to your app, authenticated. No custom login
+form in this app at all.
+
+1. Create the user pool
+   Cognito -> "Set up resources for your application" quick setup
+
+     - Application type: Single-page application (SPA)
+     - Name your application: e.g. cognito-demo-app
+     - Options for sign-in identifiers: check Email only
+     - Self-registration: turn ON (this is what makes "Sign up" show up
+       on the hosted page)
+     - Required attributes for sign-up: leave as just email
+     - Add a return URL: http://localhost:5173/   (trailing slash matters!)
+     - Create user directory
+
+2. Confirm the sign-out URL is registered
+   The quick setup only asks for a sign-IN return URL, not sign-out.
+
+   Left sidebar -> App clients -> click your app client -> Hosted UI ->
+   Edit -> add http://localhost:5173/ under "Allowed sign-out URLs" if
+   it isn't already there -> Save
+
+3. Grab your four values
+   - User Pool ID     -> pool's Overview page
+   - App Client ID    -> App clients list
+   - Cognito domain   -> left sidebar: Branding -> Domain
+   - Region           -> shown in the console (e.g. eu-north-1)
+
+4. Fill in demo/frontend/.env
+   (this file is gitignored - real values only go here, never in .env.example)
+
+     VITE_API_URL=http://localhost:3000
+     VITE_COGNITO_USER_POOL_ID=<your user pool id>
+     VITE_COGNITO_CLIENT_ID=<your app client id>
+     VITE_COGNITO_DOMAIN=<your cognito domain, no https:// prefix>
+     VITE_APP_URL=http://localhost:5173/
+
+   Important: VITE_APP_URL must match the callback/sign-out URLs
+   registered in Cognito EXACTLY, including the trailing slash.
+
+5. Test it
+
+     cd demo/frontend
+     npm run dev
+
+   Open http://localhost:5173, click Login. You should land on a
+   Cognito-hosted page, be able to sign up or sign in, and get bounced
+   back to /profile with a real access token showing.
+
+
 TROUBLESHOOTING CHEAT SHEET
 ----------------------------
 
@@ -171,6 +227,20 @@ TROUBLESHOOTING CHEAT SHEET
   GitHub Action fails on "update-function-code"
     -> LAMBDA_FUNCTION_NAME doesn't match the real function name, or the
        IAM policy's Resource ARN doesn't match
+
+  Cognito shows "Something went wrong / An error was encountered with
+  the requested page" after clicking Login
+    -> almost always a redirect_uri mismatch. VITE_APP_URL in .env must
+       match the "Allowed callback URLs" / "Allowed sign-out URLs" on
+       the App Client character-for-character, including the trailing
+       slash. Restart "npm run dev" after changing .env - Vite only
+       reads it on startup.
+
+  Cognito redirect fails with invalid_scope
+    -> amplifyConfig.ts requests a scope (e.g. "profile") that isn't
+       enabled on the App Client's Hosted UI OAuth scopes. Either enable
+       it in the console or remove it from the scopes array - it just
+       needs to be a subset of what's enabled.
 
 
 That's the whole thing! If anything goes wrong at any step, copy the exact

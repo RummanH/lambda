@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authService } from '../services/authService';
 
 function truncateToken(token: string): string {
@@ -8,11 +8,35 @@ function truncateToken(token: string): string {
 
 export default function Profile() {
   const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
 
-  const email = authService.getEmail();
-  const userId = authService.getUserId();
-  const token = authService.getAccessToken();
-  const loggedIn = authService.isAuthenticated();
+  useEffect(() => {
+    Promise.all([
+      authService.getEmail(),
+      authService.getUserId(),
+      authService.getAccessToken(),
+      authService.isAuthenticated(),
+    ]).then(([email, userId, token, loggedIn]) => {
+      setEmail(email);
+      setUserId(userId);
+      setToken(token);
+      setLoggedIn(loggedIn);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <div>
+        <h1>Profile</h1>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div>

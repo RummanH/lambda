@@ -1,56 +1,60 @@
+import {
+  fetchAuthSession,
+  fetchUserAttributes,
+  getCurrentUser,
+  signInWithRedirect,
+  signOut,
+} from 'aws-amplify/auth';
+
 /**
- * Placeholder auth service.
+ * Thin wrapper around Amplify's Cognito Hosted UI flow.
  *
- * TODO(AWS): Replace this in-memory/localStorage stand-in with real calls
- * into AWS Cognito, either via the `amazon-cognito-identity-js` SDK or
- * (preferred) `aws-amplify`'s Auth module. That will handle the actual
- * SRP login flow, token refresh, and secure storage.
+ * login() sends the browser to Cognito's own hosted login/sign-up page
+ * (configured in amplifyConfig.ts) - there's no local email/password form.
+ * Cognito redirects back to VITE_APP_URL once the user is authenticated,
+ * and Amplify handles exchanging the auth code for tokens automatically.
  */
-
-const ACCESS_TOKEN_KEY = 'demo_access_token';
-const EMAIL_KEY = 'demo_email';
-const USER_ID_KEY = 'demo_user_id';
-
 class AuthService {
-  async login(email: string, password: string): Promise<void> {
-    // TODO(AWS): call Cognito's InitiateAuth (USER_PASSWORD_AUTH flow) or
-    // Amplify's `signIn({ username, password })` here, then store the
-    // real access token / id token / sub returned by Cognito.
-    void password; // not used yet - password isn't sent anywhere in this demo
-
-    const fakeAccessToken = `fake-access-token-for-${email}`;
-    const fakeUserId = `fake-user-id-${email}`;
-
-    localStorage.setItem(ACCESS_TOKEN_KEY, fakeAccessToken);
-    localStorage.setItem(EMAIL_KEY, email);
-    localStorage.setItem(USER_ID_KEY, fakeUserId);
+  async login(): Promise<void> {
+    // Navigates the browser away - nothing to await a result from here.
+    await signInWithRedirect();
   }
 
-  logout(): void {
-    // TODO(AWS): call Cognito's GlobalSignOut / Amplify's `signOut()` so
-    // the refresh token is revoked server-side, not just cleared locally.
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(EMAIL_KEY);
-    localStorage.removeItem(USER_ID_KEY);
+  async logout(): Promise<void> {
+    // Also redirects to Cognito's logout endpoint and back, since OAuth
+    // is configured in amplifyConfig.ts.
+    await signOut();
   }
 
-  getAccessToken(): string | null {
-    // TODO(AWS): once Amplify is integrated, prefer reading the current
-    // session's access token (with automatic refresh) instead of a raw
-    // localStorage value.
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  async getAccessToken(): Promise<string | null> {
+    try {
+      const session = await fetchAuthSession();
+      return session.tokens?.accessToken?.toString() ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  isAuthenticated(): boolean {
-    return this.getAccessToken() !== null;
+  async isAuthenticated(): Promise<boolean> {
+    return (await this.getAccessToken()) !== null;
   }
 
-  getEmail(): string | null {
-    return localStorage.getItem(EMAIL_KEY);
+  async getEmail(): Promise<string | null> {
+    try {
+      const attributes = await fetchUserAttributes();
+      return attributes.email ?? null;
+    } catch {
+      return null;
+    }
   }
 
-  getUserId(): string | null {
-    return localStorage.getItem(USER_ID_KEY);
+  async getUserId(): Promise<string | null> {
+    try {
+      const user = await getCurrentUser();
+      return user.userId;
+    } catch {
+      return null;
+    }
   }
 }
 
