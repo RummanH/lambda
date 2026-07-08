@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Hub } from 'aws-amplify/utils';
 import Home from './pages/Home';
+import Items from './pages/Items';
 import Profile from './pages/Profile';
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
     <div className="container">
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/items" element={<Items />} />
         <Route path="/profile" element={<Profile />} />
       </Routes>
     </div>

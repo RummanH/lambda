@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 
 function truncateToken(token: string): string {
@@ -29,41 +30,54 @@ export default function Profile() {
     });
   }, []);
 
-  if (loading) {
-    return (
-      <div>
-        <h1>Profile</h1>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <h1>Profile</h1>
+      <div className="page-header">
+        <div>
+          <h1>Profile</h1>
+          <p className="page-subtitle">Your current Cognito session.</p>
+        </div>
+        <Link to="/" className="link-back">
+          &larr; Home
+        </Link>
+      </div>
 
-      <p>
-        <strong>Login status:</strong> {loggedIn ? 'Logged in' : 'Not logged in'}
-      </p>
-      <p>
-        <strong>Email:</strong> {email ?? '-'}
-      </p>
-      <p>
-        <strong>User ID:</strong> {userId ?? '-'}
-      </p>
-      <p>
-        <strong>Access Token:</strong>{' '}
-        {token ? (
-          <>
-            <code>{expanded ? token : truncateToken(token)}</code>{' '}
-            <button onClick={() => setExpanded((v) => !v)}>
-              {expanded ? 'Hide' : 'Expand'}
-            </button>
-          </>
-        ) : (
-          '-'
-        )}
-      </p>
+      {loading ? (
+        <div className="items-empty">Loading...</div>
+      ) : (
+        <div className="profile-card">
+          <div className="profile-row">
+            <span className="profile-label">Status</span>
+            <span className={`status-pill ${loggedIn ? 'status-on' : 'status-off'}`}>
+              {loggedIn ? 'Logged in' : 'Not logged in'}
+            </span>
+          </div>
+          <div className="profile-row">
+            <span className="profile-label">Email</span>
+            <span className="profile-value">{email ?? '—'}</span>
+          </div>
+          <div className="profile-row">
+            <span className="profile-label">User ID</span>
+            <span className="profile-value mono">{userId ?? '—'}</span>
+          </div>
+          <div className="profile-row">
+            <span className="profile-label">Access Token</span>
+            <span className="profile-value mono">
+              {token ? (expanded ? token : truncateToken(token)) : '—'}
+            </span>
+          </div>
+          {token && (
+            <div className="profile-row profile-row-action">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? 'Hide token' : 'Expand token'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,6 @@ import {
   fetchUserAttributes,
   getCurrentUser,
   signInWithRedirect,
-  signOut,
 } from 'aws-amplify/auth';
 
 /**
@@ -20,10 +19,15 @@ class AuthService {
     await signInWithRedirect();
   }
 
-  async logout(): Promise<void> {
-    // Also redirects to Cognito's logout endpoint and back, since OAuth
-    // is configured in amplifyConfig.ts.
-    await signOut();
+  logout(): void {
+    // Local-only logout: wipes Amplify's cached tokens and reloads.
+    // Doesn't invalidate the Cognito hosted-login session itself, so a
+    // fresh Login click may silently sign back in without a password
+    // prompt - deliberate tradeoff for a simpler demo flow, no redirect
+    // to Cognito's logout endpoint.
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
   }
 
   async getAccessToken(): Promise<string | null> {

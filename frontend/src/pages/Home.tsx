@@ -1,8 +1,17 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { api } from '../services/api';
 
 export default function Home() {
+  // null while the session check is in flight, so we don't flash the
+  // wrong button before we know whether the user is signed in.
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    authService.isAuthenticated().then(setLoggedIn);
+  }, []);
+
   const handleLogin = () => {
     // Sends the browser to Cognito's Hosted UI - login and sign-up both
     // happen there, not in this app. See amplifyConfig.ts / App.tsx for
@@ -27,16 +36,29 @@ export default function Home() {
   return (
     <div>
       <h1>AWS Cognito + Lambda Demo</h1>
+      <p>Sign in with Cognito, then call the protected NestJS API.</p>
 
       <div className="button-row">
-        <button onClick={handleLogin}>Login</button>
-        <button onClick={handleCallProtectedApi}>Call Protected API</button>
-        <button onClick={handleLogout}>Logout</button>
+        {loggedIn === null ? null : loggedIn ? (
+          <>
+            <button className="btn btn-ghost" onClick={handleCallProtectedApi}>
+              Call Protected API
+            </button>
+            <button className="btn btn-ghost" onClick={handleLogout}>
+              Logout
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-primary" onClick={handleLogin}>
+            Login
+          </button>
+        )}
       </div>
 
-      <p>
+      <div className="links-row">
         <Link to="/profile">View Profile</Link>
-      </p>
+        <Link to="/items">Manage Items</Link>
+      </div>
     </div>
   );
 }
